@@ -108,6 +108,29 @@ bool early_boot_irqs_disabled __read_mostly;
 enum system_states system_state __read_mostly;
 EXPORT_SYMBOL(system_state);
 
+/* mindebug flag
+ * The argument "mindebug" will set this
+ * parameter, which will enable mindebug printouts
+ */
+bool mindebug_flag;
+
+/* Only print messages if mindebug_flag is set */
+void mindebug_printk(char str[])
+{
+    if(mindebug_flag)
+    {
+	printk("****** mindebug: ");
+	printk(str);
+	printk("\n");
+    }
+    else
+    {
+	printk("*----***** mindebug without the flag: ");
+	printk(str);
+	printk("\n");
+    }
+}
+
 /*
  * Boot command-line arguments
  */
@@ -168,6 +191,8 @@ static int __init obsolete_checksetup(char *line)
 	const struct obs_kernel_param *p;
 	int had_early_param = 0;
 
+	mindebug_printk("obsolete_checksetup. Undersöker ");
+	mindebug_printk(line);
 	p = __setup_start;
 	do {
 		int n = strlen(p->str);
@@ -232,6 +257,19 @@ static int __init loglevel(char *str)
 }
 
 early_param("loglevel", loglevel);
+
+/* Trying to add special debug functionality */
+static int __init mindebug(char *str)
+{
+    /* Set the mindebug_flag to enable mindebug printouts */
+    mindebug_flag=1;
+    mindebug_printk("Nu är jag i mindebug()");
+    return 0;
+}
+early_param("mindebug", mindebug);
+
+
+
 
 /* Change NUL term back to "=", to make "param" the whole string. */
 static int __init repair_env_string(char *param, char *val, const char *unused)
@@ -320,6 +358,7 @@ static int __init init_setup(char *str)
 {
 	unsigned int i;
 
+	mindebug_printk("I init_setup");
 	execute_command = str;
 	/*
 	 * In case LILO is going to boot us with default command line,
@@ -337,6 +376,7 @@ static int __init rdinit_setup(char *str)
 {
 	unsigned int i;
 
+	mindebug_printk("I rdinit_setup");
 	ramdisk_execute_command = str;
 	/* See "auto" comment in init_setup */
 	for (i = 1; i < MAX_INIT_ARGS; i++)
@@ -383,6 +423,7 @@ static noinline void __init_refok rest_init(void)
 {
 	int pid;
 
+	mindebug_printk("I rest_init");
 	rcu_scheduler_starting();
 	/*
 	 * We need to spawn init first so that it obtains pid 1, however
@@ -453,6 +494,8 @@ static void __init boot_cpu_init(void)
 {
 	int cpu = smp_processor_id();
 	/* Mark the boot cpu "present", "online" etc for SMP and UP case */
+	printk("***** I boot_cpu_init");
+	mindebug_printk("I boot_cpu_init");
 	set_cpu_online(cpu, true);
 	set_cpu_active(cpu, true);
 	set_cpu_present(cpu, true);
@@ -478,6 +521,7 @@ static void __init mm_init(void)
 	 * page_ext requires contiguous pages,
 	 * bigger than MAX_ORDER unless SPARSEMEM.
 	 */
+	mindebug_printk("I mm_init");
 	page_ext_init_flatmem();
 	mem_init();
 	kmem_cache_init();
@@ -490,23 +534,32 @@ asmlinkage __visible void __init start_kernel(void)
 {
 	char *command_line;
 	char *after_dashes;
-
+	
+	printk("*****i start_kernel()");
+	mindebug_printk("Nu är jag i start_kernel()");
 	/*
 	 * Need to run as early as possible, to initialize the
 	 * lockdep hash:
 	 */
+	mindebug_printk("lockdep_init()");
 	lockdep_init();
+	mindebug_printk("set_task_stack_end_magic()");
 	set_task_stack_end_magic(&init_task);
+	mindebug_printk("smp_setup_processor_id()");
 	smp_setup_processor_id();
+	mindebug_printk("debug_objects_early_init()");
 	debug_objects_early_init();
 
 	/*
 	 * Set up the the initial canary ASAP:
 	 */
+	mindebug_printk("boot_init_stacK_canary()");
 	boot_init_stack_canary();
 
+	mindebug_printk("cgroup_init_early()");
 	cgroup_init_early();
 
+	mindebug_printk("local_irq_disable()");
 	local_irq_disable();
 	early_boot_irqs_disabled = true;
 
@@ -514,17 +567,27 @@ asmlinkage __visible void __init start_kernel(void)
  * Interrupts are still disabled. Do necessary setups, then
  * enable them
  */
+	mindebug_printk("boot_cpu_init()");
 	boot_cpu_init();
+	mindebug_printk("page_address_init()");
 	page_address_init();
 	pr_notice("%s", linux_banner);
+	mindebug_printk("setup_arch()");
 	setup_arch(&command_line);
+	mindebug_printk("mm_init_cpumask()");
 	mm_init_cpumask(&init_mm);
+	mindebug_printk("setup_command_line()");
 	setup_command_line(command_line);
+	mindebug_printk("setup_nr_cpu_ids()");
 	setup_nr_cpu_ids();
+	mindebug_printk("setup_per_cpu_areas()");
 	setup_per_cpu_areas();
+	mindebug_printk("smp_prepare_boot_cpu()");
 	smp_prepare_boot_cpu();	/* arch-specific boot-cpu hooks */
 
+	mindebug_printk("build_all_zonelists()");
 	build_all_zonelists(NULL, NULL);
+	mindebug_printk("page_alloc_init()");
 	page_alloc_init();
 
 	pr_notice("Kernel command line: %s\n", boot_command_line);
@@ -537,6 +600,7 @@ asmlinkage __visible void __init start_kernel(void)
 		parse_args("Setting init args", after_dashes, NULL, 0, -1, -1,
 			   set_init_arg);
 
+	mindebug_printk("jump_label_init()");
 	jump_label_init();
 
 	/*
@@ -838,7 +902,12 @@ static char *initcall_level_names[] __initdata = {
 static void __init do_initcall_level(int level)
 {
 	initcall_t *fn;
-
+	char strLevel[15];
+	sprintf(strLevel, "%d", level);
+	mindebug_printk("I do_initcall_level");
+	mindebug_printk(strLevel);
+	mindebug_printk(initcall_level_names[level]);
+	mindebug_printk(initcall_command_line);
 	strcpy(initcall_command_line, saved_command_line);
 	parse_args(initcall_level_names[level],
 		   initcall_command_line, __start___param,
@@ -867,6 +936,7 @@ static void __init do_initcalls(void)
  */
 static void __init do_basic_setup(void)
 {
+	mindebug_printk("I do_basic_setup");
 	cpuset_init_smp();
 	usermodehelper_init();
 	shmem_init();
@@ -899,6 +969,7 @@ void __init load_default_modules(void)
 
 static int run_init_process(const char *init_filename)
 {
+	mindebug_printk("I run_init_process");
 	argv_init[0] = init_filename;
 	return do_execve(getname_kernel(init_filename),
 		(const char __user *const __user *)argv_init,
@@ -925,16 +996,17 @@ static int __ref kernel_init(void *unused)
 {
 	int ret;
 
+	mindebug_printk("I kernel_init\n");
 	kernel_init_freeable();
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
+	mindebug_printk("free_initmem()");
 	free_initmem();
 	mark_rodata_ro();
 	system_state = SYSTEM_RUNNING;
 	numa_default_policy();
 
 	flush_delayed_fput();
-
 	if (ramdisk_execute_command) {
 		ret = run_init_process(ramdisk_execute_command);
 		if (!ret)
@@ -950,6 +1022,8 @@ static int __ref kernel_init(void *unused)
 	 * trying to recover a really broken machine.
 	 */
 	if (execute_command) {
+	    mindebug_printk("execute_command:");	    
+		mindebug_printk(execute_command);
 		ret = run_init_process(execute_command);
 		if (!ret)
 			return 0;
@@ -968,6 +1042,7 @@ static int __ref kernel_init(void *unused)
 
 static noinline void __init kernel_init_freeable(void)
 {
+	mindebug_printk("I kernel_init_freeable\n");
 	/*
 	 * Wait until kthreadd is all set-up.
 	 */
@@ -1026,5 +1101,6 @@ static noinline void __init kernel_init_freeable(void)
 	 */
 
 	integrity_load_keys();
+	mindebug_printk("load_default_modules()");
 	load_default_modules();
 }
